@@ -29,7 +29,7 @@ use aes::cipher::{BlockEncrypt, KeyInit,
 };
 
 use ark_serialize::{CanonicalSerialize, SerializationError, CanonicalDeserialize, Compress, Valid, Validate};
-use ark_ff::{Field, biginteger::BigInteger256};
+use ark_ff::{Field, Zero, biginteger::BigInteger256};
 use ark_poly::{
     Polynomial,
     univariate::DensePolynomial, 
@@ -410,7 +410,7 @@ fn partial_signatures_verification_dleq(partial_sig_vec: &Vec<PartialSigDleq>,me
 }
 
 //generating the lagrange coefficients for hints verification
-fn generate_public_polynomials(n: usize,i: usize, z_of_x: &DensePolynomial<F>) -> PublicPolynomials {
+fn generate_public_polynomials(n: usize,i: usize, _z_of_x: &DensePolynomial<F>) -> PublicPolynomials {
     let l_i_of_x = utils::lagrange_poly(n, i);
     //let z_of_x = utils::compute_vanishing_poly(n);
     let mut cross_terms = vec![];
@@ -422,7 +422,7 @@ fn generate_public_polynomials(n: usize,i: usize, z_of_x: &DensePolynomial<F>) -
             let l_j_of_x = utils::lagrange_poly(n, j);
             num = l_j_of_x.mul(&l_i_of_x);
         }
-        cross_terms.push(num.div(&z_of_x)) ;
+        cross_terms.push(divide_by_vanishing_polynomial(&num, n));
     }
    // let x_monomial = utils::compute_x_monomial();
     let l_i_of_0 = l_i_of_x.evaluate(&F::from(0));
@@ -1067,7 +1067,7 @@ fn prove(
     let ω_inv: F = F::from(1) / ω;
 
     //compute all the polynomials we will need in the prover
-    let z_of_x = utils::compute_vanishing_poly(n); //returns Z(X) = X^n - 1
+    let _z_of_x = utils::compute_vanishing_poly(n); //returns Z(X) = X^n - 1
     let l_n_minus_1_of_x = utils::lagrange_poly(n, n-1);
     let w_of_x = utils::interpolate_poly_over_mult_subgroup(&weights);
     let b_signer_of_x = utils::interpolate_poly_over_mult_subgroup(&bitmap_signer);
@@ -1083,36 +1083,36 @@ fn prove(
     let psw_sub_of_x_div_ω = utils::poly_domain_mult_ω(&psw_sub_of_x, &ω_inv) ;
     //ParSumSubW_sub(x)=ParSumSubW_sub(X/ω) + W_sub(X).b_sub(X) + Z(X).Q1_sub(X)
     let t_of_x = psw_sub_of_x.sub(&psw_sub_of_x_div_ω).sub(&w_sub_of_x.mul(&b_sub_of_x));
-    let psw_sub_wff_q_of_x = t_of_x.div(&z_of_x);
+    let psw_sub_wff_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
     //L_{n−1}(X) · ParSumSubW(X) = Z(X) · Q2(X) 
     let t_of_x = l_n_minus_1_of_x.mul(&psw_sub_of_x);
-    let psw_sub_check_q_of_x = t_of_x.div(&z_of_x);
+    let psw_sub_check_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
     //b_sub(X) · b_sub(X) − b_sub(X) = Z(X) · Q3(X)
     let t_of_x = b_sub_of_x.mul(&b_sub_of_x).sub(&b_sub_of_x);
-    let b_sub_wff_q_of_x = t_of_x.div(&z_of_x);
+    let b_sub_wff_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
     //L_{n−1}(X) · (b_sub(X) - 1) = Z(X) · Q4(X)
     let t_of_x = l_n_minus_1_of_x.clone().mul(
         &b_sub_of_x.clone().sub(&utils::compute_constant_poly(&F::from(1))));
-    let b_sub_check_q_of_x = t_of_x.div(&z_of_x);
+    let b_sub_check_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
 
 
 
     //ParSumSignerW(X) = ParSumSignerW(X/ω) + W(X) · b_signer(X) + Z(X) · Q1(X)
     let t_of_x = psw_of_x.sub(&psw_of_x_div_ω).sub(&w_of_x.mul(&b_signer_of_x));
-    let psw_wff_q_of_x = t_of_x.div(&z_of_x);
+    let psw_wff_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
 
     //L_{n−1}(X) · ParSumW(X) = Z(X) · Q2(X) 
     let t_of_x = l_n_minus_1_of_x.mul(&psw_of_x);
-    let psw_check_q_of_x = t_of_x.div(&z_of_x);
+    let psw_check_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
 
     //b_signer(X) · b_signer(X) − b_signer(X) = Z(X) · Q3(X)
     let t_of_x = b_signer_of_x.mul(&b_signer_of_x).sub(&b_signer_of_x);
-    let b_wff_q_of_x = t_of_x.div(&z_of_x);
+    let b_wff_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
 
     //L_{n−1}(X) · (b_signer(X) - 1) = Z(X) · Q4(X)
     let t_of_x = l_n_minus_1_of_x.clone().mul(
         &b_signer_of_x.clone().sub(&utils::compute_constant_poly(&F::from(1))));
-    let b_check_q_of_x = t_of_x.div(&z_of_x);
+    let b_check_q_of_x = divide_by_vanishing_polynomial(&t_of_x, n);
 
     let parsum_signer_of_tau_com = KZG::commit_g1(&params, &psw_of_x).unwrap();
     let b_signer_of_tau = KZG::commit_g1(&params, &b_signer_of_x).unwrap();
@@ -1499,12 +1499,19 @@ fn compute_psw_poly(weights: &Vec<F>, bitmap: &Vec<F>) -> DensePolynomial<F> {
 
     let domain = Radix2EvaluationDomain::<F>::new(n).unwrap();
     let eval_form = Evaluations::from_vec_and_domain(evals, domain);
-    eval_form.interpolate()    
+    eval_form.interpolate()
+}
+
+fn divide_by_vanishing_polynomial(
+    polynomial: &DensePolynomial<F>,
+    n: usize,
+) -> DensePolynomial<F> {
+    utils::divide_by_vanishing_polynomial(polynomial, n)
 }
 
 // some tests//
 #[allow(dead_code)]
-fn hint_independent_computation_test(n:usize,params: &UniversalParams<Curve>,i:usize, z_of_x: &DensePolynomial<F>)-> HintIndependentSetupElements {
+fn hint_independent_computation_test(n:usize,params: &UniversalParams<Curve>,i:usize, _z_of_x: &DensePolynomial<F>)-> HintIndependentSetupElements {
 
     
     let l_i_of_x = utils::lagrange_poly(n, i);
@@ -1527,7 +1534,7 @@ fn hint_independent_computation_test(n:usize,params: &UniversalParams<Curve>,i:u
             num = l_j_of_x.mul(&l_i_of_x);
            
         }
-        let f = num.div(&z_of_x);
+        let f = divide_by_vanishing_polynomial(&num, n);
         cross_terms_com.push(KZG::commit_g2(&params, &f).expect("commitment failed"));
     }
     let duration = start.elapsed();
@@ -1788,7 +1795,7 @@ fn checking_cross_terms_by_prover(params: &UniversalParams<Curve>,
         let l_i_of_x = utils::lagrange_poly(n, i);
             if j != i {  
                 let l_j_of_x = utils::lagrange_poly(n, j) ;
-                let l_i_l_j_of_x = l_i_of_x.clone().mul(&l_j_of_x).div(&z_of_x) ;
+                let l_i_l_j_of_x = divide_by_vanishing_polynomial(&l_i_of_x.clone().mul(&l_j_of_x), n);
                 let l_i_l_j_tau_com = KZG::commit_g1(&params, &l_i_l_j_of_x).expect("commitment failed") ;
                 cross_terms.push(l_i_l_j_tau_com) ;
             }      
@@ -2000,10 +2007,10 @@ mod tests {
         //t(X) = ParSumW(ω · X) − ParSumW(X) − W(ω · X) · b(ω · X)
         let t_of_x = psw_of_ωx.sub(&psw_of_x).sub(&w_of_ωx.mul(&b_of_ωx));
         let z_of_x = utils::compute_vanishing_poly(n as usize); //returns Z(X) = X^n - 1
-        let q2_of_x = t_of_x.div(&z_of_x);
+        let q2_of_x = divide_by_vanishing_polynomial(&t_of_x, n as usize);
 
         let t_of_x = b_signer_of_x.mul(&b_signer_of_x).sub(&b_signer_of_x);
-        let q1_of_x = t_of_x.div(&z_of_x);
+        let q1_of_x = divide_by_vanishing_polynomial(&t_of_x, n as usize);
         
         sanity_test_poly_domain_mult(&w_of_x, &w_of_ωx, &ω);
         sanity_test_poly_domain_mult(&b_signer_of_x, &b_of_ωx, &ω);
@@ -2086,7 +2093,6 @@ mod tests {
         bitmap: &Vec<F>
     ) -> DensePolynomial<F> {
         let n = sk.len();
-        let z_of_x = utils::compute_vanishing_poly(n);
         //Li(x) · Li(x) − Li(x) / Z(x)
         let mut q1 = utils::compute_constant_poly(&F::from(0));
 
@@ -2096,7 +2102,7 @@ mod tests {
             let l_i_of_x = utils::lagrange_poly(n, i);
             let num = l_i_of_x.mul(&l_i_of_x).sub(&l_i_of_x);
             //let num = num.sub(&l_i_of_x);
-            let f_i = num.div(&z_of_x);
+            let f_i = divide_by_vanishing_polynomial(&num, n);
             let sk_i_f_i = utils::poly_eval_mult_c(&f_i, &sk[i]);
 
             q1 = q1.add(sk_i_f_i);
@@ -2107,7 +2113,7 @@ mod tests {
 
                 let l_j_of_x = utils::lagrange_poly(n, j);
                 let num = l_j_of_x.mul(&l_i_of_x);
-                let f_j = num.div(&z_of_x);
+                let f_j = divide_by_vanishing_polynomial(&num, n);
                 let sk_j_f_j = utils::poly_eval_mult_c(&f_j, &sk[j]);
 
                 q1_inner = q1_inner.add(sk_j_f_j);
@@ -2685,9 +2691,4 @@ mod tests {
         //let cross_terms = untrusted_server(&params, n, &z_of_x) ;
         checking_cross_terms_by_prover(&params, n, i, &z_of_x);
     }
-
-       
-
-    }
-
-
+}

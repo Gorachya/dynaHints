@@ -61,8 +61,6 @@ pub fn hint_gen(
     sk_i: &F) -> Hint {
     //let us compute the q1 term
     let l_i_of_x = utils::lagrange_poly(n, i);
-    let z_of_x = utils::compute_vanishing_poly(n);
-
     let mut qz_terms = vec![];
     //let us compute the cross terms of q1
     for j in 0..n {
@@ -74,7 +72,7 @@ pub fn hint_gen(
             num = l_j_of_x.mul(&l_i_of_x);
         }
 
-        let f = num.div(&z_of_x);
+        let f = utils::divide_by_vanishing_polynomial(&num, n);
         let sk_times_f = utils::poly_eval_mult_c(&f, &sk_i);
 
         let com = KZG::commit_g1(&params, &sk_times_f)

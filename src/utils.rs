@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
-use ark_ff::{Field, /* FftField */ };
+use ark_ff::{Field, Zero, /* FftField */ };
 use ark_poly::{
     Polynomial,
-    univariate::DensePolynomial, 
+    univariate::DensePolynomial,
+    DenseUVPolynomial,
     EvaluationDomain, 
     Radix2EvaluationDomain,
     Evaluations
@@ -24,6 +25,18 @@ pub fn compute_vanishing_poly(n: usize) -> DensePolynomial<F> {
         }
     }
     DensePolynomial { coeffs }
+}
+
+pub fn divide_by_vanishing_polynomial(
+    polynomial: &DensePolynomial<F>,
+    n: usize,
+) -> DensePolynomial<F> {
+    let domain = Radix2EvaluationDomain::<F>::new(n).expect("N must be a power of two");
+    let (quotient, remainder) = polynomial
+        .divide_by_vanishing_poly(domain)
+        .expect("vanishing polynomial division failed");
+    debug_assert!(remainder.is_zero(), "polynomial is not divisible by X^N - 1");
+    quotient
 }
 
 /// interpolate polynomial which evaluates to points in v
