@@ -18,9 +18,6 @@ use sha2::{Digest, Sha256};
 use hex ;
 use std::collections::HashSet;
 
-use vrf::openssl::{CipherSuite, ECVRF};
-use vrf::VRF;
-
 //use rand_chacha ;
 
 use aes::Aes128;
@@ -231,14 +228,14 @@ fn sample_weights(n: usize) -> Vec<F> {
     //(0..n).map(|_| F::from(u64::rand(&mut rng))).collect()
 }
 
-//this is to create committee from the vrf output 
+// Create the committee from pseudorandom output.
 
-fn create_committee(com_size: usize, universe_size: usize, vrf_output: &Vec<u8>) -> Vec<F> {
+fn create_committee(com_size: usize, universe_size: usize, random_output: &[u8]) -> Vec<F> {
     
  
-     //putting the vrf output as key into aes
+     // Use the random output as an AES key.
      let mut result = HashSet::new();
-     let beta1 = &vrf_output.clone() ;
+     let beta1 = random_output;
      let key:[u8;16] = [beta1[0],beta1[1],beta1[2],beta1[3],beta1[4],
                        beta1[5],beta1[6],beta1[7],beta1[8],beta1[9],
                        beta1[10],beta1[11],beta1[12],beta1[13],beta1[14],
@@ -307,30 +304,10 @@ fn create_subset_bitmap(n: usize, bmap: &Vec<F>, thresh: usize)-> Vec<F> {
 
 }
 
-fn verify_committee(com_size: usize, universe_size: usize, b_com_of_tau: G1,vrf_instan: &mut ECVRF,vrf_message: &[u8], vrf_proof: &Vec<u8>, vrf_pk: &Vec<u8>,params: &UniversalParams<Curve>) {
-
-    let pi = vrf_proof.clone() ;
-    let pk = vrf_pk.clone() ;
-    //let start = Instant::now();
-    
-    let hash = vrf_instan.proof_to_hash(&pi).unwrap();
-    //println!("verify committee hash is {:?}",hash) ;
-    let beta = vrf_instan.verify(&pk, &pi, &vrf_message);
-    match beta.as_ref() {
-        Ok(beta) => {
-            assert_eq!(&hash, beta);
-        }
-        Err(e) => {
-            println!("VRF proof is not valid: {}", e);
-        }
-    }
-    //let duration = start.elapsed();
-    //println!("time to verify vrf proof is {:?}",duration);
-    
-   
+fn verify_committee(com_size: usize, universe_size: usize, b_com_of_tau: G1, random_output: &[u8], params: &UniversalParams<Curve>) {
     let mut result = HashSet::new();
    
-     let beta1 = &beta.unwrap().clone() ;
+    let beta1 = random_output;
      //let start = Instant::now() ;
      let key:[u8;16] = [beta1[0],beta1[1],beta1[2],beta1[3],beta1[4],
                        beta1[5],beta1[6],beta1[7],beta1[8],beta1[9],
@@ -783,19 +760,9 @@ fn main() {
     println!("Time elapsed in setup is: {:?}", duration);
 
    
-    // -------------- sample proof specific values ---------------
-    //have to use PRF to get c no of positions and also look for repititions
-    let mut vrf = ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap() ;
-    let secret_key =
-        hex::decode("c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721").unwrap();
-    let public_key = vrf.derive_public_key(&secret_key).unwrap();
-    let vrf_message: &[u8] = b"samplec" ;
-    let pi = vrf.prove(&secret_key, &vrf_message).unwrap();
-
-    let beta = vrf.verify(&public_key, &pi, &vrf_message);
-
-   
-    let bitmap_com = create_committee(c, n-1, &beta.unwrap()) ;
+    // Generate pseudorandom committee randomness with rand.
+    let committee_randomness: [u8; 32] = rand::random();
+    let bitmap_com = create_committee(c, n-1, &committee_randomness) ;
     let bitmap_signer = create_subset_bitmap(n - 1, &bitmap_com,t) ;
 
 
@@ -828,7 +795,7 @@ fn main() {
 
        
     let start = Instant::now();
-    verify(&vk, &π,t, &message, &dst,&mut vrf,&vrf_message, &pi, &public_key,&params);
+    verify(&vk, &π,t, &message, &dst,&committee_randomness,&params);
     let duration = start.elapsed();
     println!("Time elapsed in verifier is: {:?}", duration);
        
@@ -1307,9 +1274,9 @@ fn verify_openings_in_proof(vp: &VerificationKey, π: &Proof, r: F, t: usize) {
 
 }
 
-fn verify(vp: &VerificationKey, π: &Proof, t: usize, message: &Vec<u8>, dst: &Vec<u8>,vrf_instan: &mut ECVRF, vrf_message: &[u8], vrf_proof: &Vec<u8>, vrf_pk: &Vec<u8>,params: &UniversalParams<Curve>) {
+fn verify(vp: &VerificationKey, π: &Proof, t: usize, message: &Vec<u8>, dst: &Vec<u8>,committee_randomness: &[u8],params: &UniversalParams<Curve>) {
      //let start = Instant::now();
-    verify_committee(vp.c, vp.n-1, π.b_committee_of_tau,vrf_instan, vrf_message, vrf_proof, vrf_pk,params) ;
+    verify_committee(vp.c, vp.n-1, π.b_committee_of_tau,committee_randomness,params) ;
     //let duration = start.elapsed();
     //println!("time to verify committee is {:?}",duration);
 

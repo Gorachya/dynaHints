@@ -440,7 +440,7 @@ fn prefix_weight_polynomial(weights: &[Fr], bitmap: &[Fr]) -> DensePolynomial<Fr
 fn benchmark_synthetic_prove(c: &mut Criterion) {
     let mut group = c.benchmark_group("synthetic_signature_aggregation_and_prove");
     group.sample_size(10);
-    for n_exponent in (8usize..=8).step_by(2) {
+    for n_exponent in (8usize..=12).step_by(2) {
         let n = 1usize << n_exponent;
         let mut rng = test_rng();
         let params = Kzg::setup(n, &mut rng).expect("KZG setup failed");
