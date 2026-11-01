@@ -50,4 +50,8 @@ parallel = [ "ark-std/parallel", "ark-ff/parallel",  "ark-ec/parallel", ]
 
 [profile.dev]
 opt-level = 3
+
+[[bench]]
+name = "synthetic_prove"
+harness = false
   
